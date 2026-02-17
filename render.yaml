@@ -6,6 +6,7 @@ services:
     env: python
     buildCommand: pip install -r backend/requirements.txt
     startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: 3.10.0
@@ -18,8 +19,6 @@ services:
   - type: static
     name: dropout-ai-frontend
     env: static
-    # Assuming a standard Vite build. If you don't have a package.json, 
-    # Render can also serve just the directory if it's plain HTML/JS.
     buildCommand: npm install && npm run build
     publishPath: ./dist
     envVars:

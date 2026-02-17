@@ -8,10 +8,17 @@ import { EmotionalAnalysis, Intervention, EmotionalState } from "../types";
 
 const getApiKey = (): string => {
   try {
-    return process.env.API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY || "";
+    // Safely check for API key without triggering ReferenceError on 'process'
+    if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+      return process.env.API_KEY;
+    }
+    if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
+      return (import.meta as any).env.VITE_GEMINI_API_KEY || (import.meta as any).env.API_KEY || "";
+    }
   } catch (e) {
-    return "";
+    // Ignore
   }
+  return "";
 };
 
 export const analyzeEmotionalState = async (text: string): Promise<EmotionalAnalysis> => {
