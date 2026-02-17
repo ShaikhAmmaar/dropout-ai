@@ -16,14 +16,9 @@ export const analyzeEmotionalState = async (text: string): Promise<EmotionalAnal
     };
   }
 
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) {
-    console.warn("Gemini API Key missing. Falling back to local analysis.");
-    return fallbackAnalysis(text);
-  }
-
+  // Always use process.env.API_KEY and correct initialization format
   try {
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `Analyze: "${text}"`,
@@ -43,6 +38,7 @@ export const analyzeEmotionalState = async (text: string): Promise<EmotionalAnal
       },
     });
 
+    // Access .text property directly
     return JSON.parse(response.text || "{}");
   } catch (error) {
     return fallbackAnalysis(text);
@@ -61,26 +57,34 @@ const fallbackAnalysis = (text: string): EmotionalAnalysis => {
 };
 
 export const generateInterventionPlan = async (name: string, reportData: any): Promise<Intervention> => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) {
-    return {
-      message: "Standard support plan active. Please consult a mentor.",
-      recovery_plan: ["Focus on core attendance.", "Complete pending assignments."],
-      recommendations: ["Speak with an academic advisor."],
-    };
-  }
-
+  // Always use process.env.API_KEY and correct initialization format
   try {
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
       contents: `Generate recovery plan for ${name}. Context: ${JSON.stringify(reportData)}`,
       config: {
-        systemInstruction: "Generate a supportive 2-week recovery plan. Return JSON: {message: string, recovery_plan: string[], recommendations: string[]}",
+        systemInstruction: "Generate a supportive 2-week recovery plan.",
         responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            message: { type: Type.STRING },
+            recovery_plan: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING }
+            },
+            recommendations: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING }
+            }
+          },
+          required: ["message", "recovery_plan", "recommendations"],
+        }
       },
     });
 
+    // Access .text property directly
     return JSON.parse(response.text || "{}");
   } catch (error) {
     return {

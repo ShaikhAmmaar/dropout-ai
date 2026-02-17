@@ -1,5 +1,6 @@
 
 import uvicorn
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from core.config import settings
@@ -12,12 +13,11 @@ app = FastAPI(
     docs_url="/docs"
 )
 
-# CORS configuration
-# Allowing all origins for demo/Render deployment. 
-# In a strict production environment, replace ["*"] with your specific Render frontend URL.
+# CORS configuration for Vercel + Development
+# In production, replace ["*"] with your actual Vercel domain for maximum security
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -27,7 +27,7 @@ app.add_middleware(
 @app.on_event("startup")
 async def init_db():
     async with engine.begin() as conn:
-        # Create all tables if they don't exist
+        # Create all tables in Supabase if they don't exist
         await conn.run_sync(Base.metadata.create_all)
 
 # Router registration
@@ -40,17 +40,16 @@ app.include_router(admin.router, prefix=f"{settings.API_V1_STR}/admin", tags=["A
 @app.get("/")
 async def root():
     return {
-        "message": f"Welcome to the {settings.PROJECT_NAME} Backend API 🚀",
-        "docs": "/docs",
+        "message": f"Welcome to the {settings.PROJECT_NAME} Backend API",
         "status": "online",
-        "environment": "Render Production"
+        "infrastructure": "Render + Supabase"
     }
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    return {"status": "healthy", "database": "connected"}
 
 if __name__ == "__main__":
-    # Use environment PORT for Render
+    # Standard Render Port logic
     port = int(os.getenv("PORT", 8000))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
