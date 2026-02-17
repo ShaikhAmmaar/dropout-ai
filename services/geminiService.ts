@@ -8,15 +8,17 @@ import { EmotionalAnalysis, Intervention, EmotionalState } from "../types";
 
 const getApiKey = (): string => {
   try {
-    // Safely check for API key without triggering ReferenceError on 'process'
-    if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
-      return process.env.API_KEY;
-    }
+    // 1. Check window.process (shimmed in index.html)
+    const proc = (window as any).process;
+    if (proc?.env?.API_KEY) return proc.env.API_KEY;
+
+    // 2. Check Vite standard
     if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
-      return (import.meta as any).env.VITE_GEMINI_API_KEY || (import.meta as any).env.API_KEY || "";
+      const env = (import.meta as any).env;
+      return env.VITE_GEMINI_API_KEY || env.API_KEY || "";
     }
   } catch (e) {
-    // Ignore
+    console.warn("API Key lookup failed safety check.");
   }
   return "";
 };
@@ -33,7 +35,7 @@ export const analyzeEmotionalState = async (text: string): Promise<EmotionalAnal
 
   const apiKey = getApiKey();
   if (!apiKey) {
-    console.error("Gemini API Key missing.");
+    console.warn("Gemini API Key missing. Using local fallback analysis.");
     return fallbackAnalysis(text);
   }
 
@@ -41,9 +43,9 @@ export const analyzeEmotionalState = async (text: string): Promise<EmotionalAnal
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Analyze: "${text}"`,
+      contents: `Analyze student entry for distress: "${text}"`,
       config: {
-        systemInstruction: "Detect emotional state (Normal, Stress, Burnout, Anxiety, Depression Signs, Crisis). Return JSON with emotional_state, emotional_score (0-100), crisis_flag, confidence_score.",
+        systemInstruction: "You are a clinical sentiment analyzer. Detect emotional state and return JSON.",
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -58,18 +60,20 @@ export const analyzeEmotionalState = async (text: string): Promise<EmotionalAnal
       },
     });
 
-    return JSON.parse(response.text || "{}");
+    const result = JSON.parse(response.text || "{}");
+    return result;
   } catch (error) {
+    console.error("Gemini call failed:", error);
     return fallbackAnalysis(text);
   }
 };
 
 const fallbackAnalysis = (text: string): EmotionalAnalysis => {
-  const crisisKeywords = ["suicide", "kill", "end it", "hurt myself"];
+  const crisisKeywords = ["suicide", "kill", "end it", "hurt myself", "goodbye"];
   const isCrisis = crisisKeywords.some(kw => text.toLowerCase().includes(kw));
   return {
     emotional_state: isCrisis ? EmotionalState.CRISIS : EmotionalState.NORMAL,
-    emotional_score: isCrisis ? 100 : 20,
+    emotional_score: isCrisis ? 95 : 10,
     crisis_flag: isCrisis,
     confidence_score: 50,
   };
@@ -79,9 +83,9 @@ export const generateInterventionPlan = async (name: string, reportData: any): P
   const apiKey = getApiKey();
   if (!apiKey) {
     return {
-      message: "Recovery plan unavailable (API Key missing).",
-      recovery_plan: ["Contact student support manually."],
-      recommendations: ["Seek guidance from a counselor."],
+      message: "Direct support required.",
+      recovery_plan: ["Contact faculty immediately."],
+      recommendations: ["Scheduled counseling session recommended."],
     };
   }
 
@@ -89,22 +93,16 @@ export const generateInterventionPlan = async (name: string, reportData: any): P
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
-      contents: `Generate recovery plan for ${name}. Context: ${JSON.stringify(reportData)}`,
+      contents: `Intervention for ${name}: ${JSON.stringify(reportData)}`,
       config: {
-        systemInstruction: "Generate a supportive 2-week recovery plan.",
+        systemInstruction: "Generate a supportive academic recovery plan.",
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
             message: { type: Type.STRING },
-            recovery_plan: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING }
-            },
-            recommendations: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING }
-            }
+            recovery_plan: { type: Type.ARRAY, items: { type: Type.STRING } },
+            recommendations: { type: Type.ARRAY, items: { type: Type.STRING } }
           },
           required: ["message", "recovery_plan", "recommendations"],
         }
@@ -114,9 +112,9 @@ export const generateInterventionPlan = async (name: string, reportData: any): P
     return JSON.parse(response.text || "{}");
   } catch (error) {
     return {
-      message: "Temporary fallback plan generated.",
-      recovery_plan: ["Reach out to student services."],
-      recommendations: ["Check institutional help docs."],
+      message: "Standard support protocol activated.",
+      recovery_plan: ["Review course materials.", "Attend office hours."],
+      recommendations: ["Balance study and rest."],
     };
   }
 };

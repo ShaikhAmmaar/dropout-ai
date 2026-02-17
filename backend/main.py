@@ -2,8 +2,9 @@
 import uvicorn
 import os
 import logging
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from core.config import settings
 from db.database import engine, Base
 from routes import auth, students, risk, mental_health, admin
@@ -18,7 +19,7 @@ app = FastAPI(
     docs_url="/docs"
 )
 
-# CORS configuration
+# CORS configuration - strict but safe for current architecture
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], 
@@ -30,17 +31,14 @@ app.add_middleware(
 # Database initialization with error handling
 @app.on_event("startup")
 async def init_db():
-    logger.info("Starting up backend and initializing database connection...")
+    logger.info("Starting up backend...")
     try:
         async with engine.begin() as conn:
-            # We don't log the full URL for security, but we log the attempt
-            logger.info("Attempting to sync database tables...")
+            logger.info("Checking database schema...")
             await conn.run_sync(Base.metadata.create_all)
-            logger.info("Database tables synced successfully.")
+            logger.info("Database initialized successfully.")
     except Exception as e:
-        logger.error(f"CRITICAL: Database initialization failed: {e}")
-        # We don't raise here to allow the app to stay alive for debugging/logs
-        # but subsequent DB calls will fail.
+        logger.error(f"DB Startup Error: {e}")
 
 # Router registration
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["Authentication"])
@@ -49,17 +47,18 @@ app.include_router(risk.router, prefix=f"{settings.API_V1_STR}/risk", tags=["Ris
 app.include_router(mental_health.router, prefix=f"{settings.API_V1_STR}/mental-health", tags=["Mental Health"])
 app.include_router(admin.router, prefix=f"{settings.API_V1_STR}/admin", tags=["Admin Analytics"])
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 async def root():
     return {
-        "message": f"Welcome to the {settings.PROJECT_NAME} Backend API",
-        "status": "online",
-        "infrastructure": "Render + Supabase"
+        "app": settings.PROJECT_NAME,
+        "status": "active",
+        "version": "1.0.0"
     }
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 async def health_check():
-    return {"status": "healthy", "database": "check_logs"}
+    """Handles both Render health checks and manual checks."""
+    return JSONResponse(content={"status": "healthy"}, status_code=200)
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))

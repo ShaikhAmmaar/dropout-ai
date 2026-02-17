@@ -11,22 +11,32 @@ logger = logging.getLogger(__name__)
 raw_url = os.getenv("DATABASE_URL", settings.DATABASE_URL)
 
 def get_async_url(url: str) -> str:
-    """Converts standard postgres URLs to asyncpg compatible ones."""
+    """
+    Ensures the connection string is compatible with asyncpg and 
+    Supabase's port 6543 (PgBouncer).
+    """
     if not url:
         return "sqlite+aiosqlite:///./dropout_fallback.db"
     
-    # Replace the driver
+    # Standardize driver
     if url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql+asyncpg://", 1)
     elif url.startswith("postgresql://"):
         url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
     
-    # Handle Supabase-specific pooling issues (port 6543)
-    # If using the pooler, asyncpg needs sslmode=require and sometimes pgbouncer=true
-    if "pooler.supabase.com" in url or ":6543" in url:
+    # Fix for Supabase Pooled Connection (port 6543)
+    if ":6543" in url:
+        # asyncpg + pgbouncer (port 6543) requires specific params to work
+        params = []
         if "sslmode" not in url:
+            params.append("sslmode=require")
+        # prepare_threshold=0 is critical for Transaction mode poolers
+        if "prepare_threshold" not in url:
+            params.append("prepare_threshold=0")
+            
+        if params:
             connector = "&" if "?" in url else "?"
-            url += f"{connector}sslmode=require"
+            url += f"{connector}{'&'.join(params)}"
             
     return url
 
@@ -36,15 +46,13 @@ try:
     engine = create_async_engine(
         async_db_url,
         echo=False,
-        pool_pre_ping=True,  # Check connection validity before using
-        pool_size=5,
-        max_overflow=10,
-        pool_timeout=30,
-        pool_recycle=1800
+        pool_pre_ping=True,
+        pool_size=10,
+        max_overflow=20,
+        pool_recycle=300 # Shorter recycle for better stability on shared hosting
     )
 except Exception as e:
     logger.error(f"Failed to create engine: {e}")
-    # Last resort fallback to local sqlite so the app doesn't crash on boot
     engine = create_async_engine("sqlite+aiosqlite:///./fatal_fallback.db")
 
 AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
