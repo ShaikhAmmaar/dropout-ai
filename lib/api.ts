@@ -3,23 +3,26 @@
  * API Client for interacting with the FastAPI Backend on Render.
  */
 
-// Define the environment variable interface for Vite
-interface ImportMetaEnv {
-  readonly VITE_API_URL: string;
-  readonly VITE_SUPABASE_URL: string;
-  readonly VITE_SUPABASE_ANON_KEY: string;
-}
-
-interface ImportMeta {
-  readonly env: ImportMetaEnv;
-}
-
-// In Vite, environment variables are accessed via import.meta.env
-// We cast to any to avoid strict TS issues during the build process on Vercel
-const env = (import.meta as any).env || {};
+const getEnv = (key: string, fallback: string): string => {
+  try {
+    // Check Vite-style env
+    if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
+      const val = (import.meta as any).env[key];
+      if (val) return val;
+    }
+    // Check process-style env (some polyfills use this)
+    if (typeof process !== 'undefined' && process.env) {
+      const val = (process as any).env[key];
+      if (val) return val;
+    }
+  } catch (e) {
+    console.warn(`Environment lookup failed for ${key}:`, e);
+  }
+  return fallback;
+};
 
 // IMPORTANT: This URL must match your Render deployment URL
-const BASE_URL = env.VITE_API_URL || 'https://dropout-ai-backend.onrender.com';
+const BASE_URL = getEnv('VITE_API_URL', 'https://dropout-ai-backend.onrender.com');
 const API_V1 = `${BASE_URL}/api/v1`;
 
 export const apiClient = {

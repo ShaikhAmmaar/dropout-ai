@@ -6,6 +6,14 @@ import { EmotionalAnalysis, Intervention, EmotionalState } from "../types";
  * Service for Gemini-powered emotional and intervention analysis.
  */
 
+const getApiKey = (): string => {
+  try {
+    return process.env.API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY || "";
+  } catch (e) {
+    return "";
+  }
+};
+
 export const analyzeEmotionalState = async (text: string): Promise<EmotionalAnalysis> => {
   if (!text.trim()) {
     return {
@@ -16,9 +24,14 @@ export const analyzeEmotionalState = async (text: string): Promise<EmotionalAnal
     };
   }
 
-  // Always use process.env.API_KEY and correct initialization format
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    console.error("Gemini API Key missing.");
+    return fallbackAnalysis(text);
+  }
+
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `Analyze: "${text}"`,
@@ -38,7 +51,6 @@ export const analyzeEmotionalState = async (text: string): Promise<EmotionalAnal
       },
     });
 
-    // Access .text property directly
     return JSON.parse(response.text || "{}");
   } catch (error) {
     return fallbackAnalysis(text);
@@ -57,9 +69,17 @@ const fallbackAnalysis = (text: string): EmotionalAnalysis => {
 };
 
 export const generateInterventionPlan = async (name: string, reportData: any): Promise<Intervention> => {
-  // Always use process.env.API_KEY and correct initialization format
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    return {
+      message: "Recovery plan unavailable (API Key missing).",
+      recovery_plan: ["Contact student support manually."],
+      recommendations: ["Seek guidance from a counselor."],
+    };
+  }
+
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
       contents: `Generate recovery plan for ${name}. Context: ${JSON.stringify(reportData)}`,
@@ -84,7 +104,6 @@ export const generateInterventionPlan = async (name: string, reportData: any): P
       },
     });
 
-    // Access .text property directly
     return JSON.parse(response.text || "{}");
   } catch (error) {
     return {
