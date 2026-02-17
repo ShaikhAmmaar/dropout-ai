@@ -9,11 +9,17 @@ export const calculateSaaSRisk = (student: StudentWithReport, emotionalScore: nu
 
   const prediction = predictRiskAdvanced(student, emotionalScore, student.history || []);
 
+  // Determine Category
+  let category = RiskCategory.SAFE;
+  if (isCrisis || prediction.ml_risk_probability > 85) category = RiskCategory.CRITICAL;
+  else if (prediction.ml_risk_probability > 65) category = RiskCategory.HIGH;
+  else if (prediction.ml_risk_probability > 35) category = RiskCategory.MODERATE;
+
   // Base Report
   const report: RiskReport = {
     ml_risk_probability: Math.round(prediction.ml_risk_probability),
     final_risk_score: Math.round(prediction.ml_risk_probability),
-    risk_category: prediction.ml_risk_probability > 70 ? RiskCategory.HIGH : prediction.ml_risk_probability > 40 ? RiskCategory.MODERATE : RiskCategory.SAFE,
+    risk_category: category,
     predicted_30_day_risk: Math.min(100, Math.round(prediction.ml_risk_probability + (student.grade_trend_negative_percentage * 0.7))),
     crisis_flag: isCrisis,
     confidence_score: prediction.confidence_score,

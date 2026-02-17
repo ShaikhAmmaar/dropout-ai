@@ -87,6 +87,39 @@ const INITIAL_STUDENTS: StudentWithReport[] = [
       emotional_drift_flag: true,
       improvement_simulation: { attendance_plus_10: 78, submission_plus_10: 84 }
     }
+  },
+  {
+    id: 's-3',
+    institution_id: 'inst-1',
+    name: 'Alex Chen',
+    email: 'alex@apex.edu',
+    attendance_percentage: 95,
+    assignment_submission_rate: 98,
+    grade_average: 94,
+    grade_trend_negative_percentage: 0,
+    login_frequency_scaled: 95,
+    participation_score: 90,
+    disciplinary_flags: 0,
+    journal_text: 'Everything is fine. Loving the new project.',
+    gender: 'Non-binary',
+    socioeconomic_status: 'High',
+    urban_or_rural: 'Urban',
+    last_updated: new Date().toISOString(),
+    history: [],
+    report: {
+      ml_risk_probability: 5,
+      final_risk_score: 5,
+      risk_category: RiskCategory.SAFE,
+      predicted_30_day_risk: 5,
+      crisis_flag: false,
+      confidence_score: 99,
+      timestamp: new Date().toISOString(),
+      feature_importances: [],
+      shap_explanation: [],
+      anomaly_flag: false,
+      emotional_drift_flag: false,
+      improvement_simulation: { attendance_plus_10: 5, submission_plus_10: 5 }
+    }
   }
 ];
 
@@ -169,14 +202,10 @@ export const logAction = (instId: string, userId: string, action: string, studen
 };
 
 export const getBiasReport = () => {
-  const students = INITIAL_STUDENTS; // In a real app, this would use a larger subset
-  const gV = 12; // Sample variance values for demo
-  const sV = 18;
-  const lV = 5;
   return {
-    bias_warning: sV > 15,
-    variance_gender: gV,
-    variance_status: sV,
-    variance_location: lV
+    bias_warning: true,
+    variance_gender: 8,
+    variance_status: 12,
+    variance_location: 4
   };
 };

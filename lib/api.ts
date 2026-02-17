@@ -1,26 +1,10 @@
 
 /**
- * API Client for interacting with the FastAPI Backend.
- * Uses environment variables for the base URL, falling back to localhost for development.
+ * API Client for interacting with the FastAPI Backend on Render.
+ * Hardcoded values for direct Vercel deployment as requested.
  */
 
-const getApiBaseUrl = () => {
-  try {
-    // Attempt to get from process.env (Next.js/Vite standard)
-    if (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_API_BASE_URL) {
-      return process.env.NEXT_PUBLIC_API_BASE_URL;
-    }
-    // Attempt to get from window (Common in some CI/CD injections)
-    if ((window as any).process?.env?.NEXT_PUBLIC_API_BASE_URL) {
-      return (window as any).process.env.NEXT_PUBLIC_API_BASE_URL;
-    }
-  } catch (e) {
-    console.warn("API Base URL environment variable not found, using default.");
-  }
-  return 'http://localhost:8000';
-};
-
-const API_BASE_URL = getApiBaseUrl();
+const API_BASE_URL = 'https://dropout-ai-backend.onrender.com';
 
 export const apiClient = {
   /**
@@ -33,34 +17,36 @@ export const apiClient = {
     assignment_completion_rate: number;
     backlogs: number;
   }) {
-    const response = await fetch(`${API_BASE_URL}/api/predict-risk`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/risk/predict/${data.student_id}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify(data),
     });
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    if (!response.ok) throw new Error(`Backend error: ${response.status}`);
     return response.json();
   },
 
   /**
-   * Analyzes student journal text for emotional distress and crisis markers.
+   * Analyzes student journal text for emotional distress.
    */
   async analyzeMentalHealth(text: string, studentId: string) {
-    const response = await fetch(`${API_BASE_URL}/api/analyze-mental-health`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/mental-health/log/${studentId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, student_id: studentId }),
+      body: JSON.stringify({ text_entry: text }),
     });
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    if (!response.ok) throw new Error(`Backend error: ${response.status}`);
     return response.json();
   },
 
   /**
-   * Fetches the risk history and trend analysis for a specific student.
+   * Fetches the analytics for the admin dashboard.
    */
-  async getRiskHistory(studentId: string) {
-    const response = await fetch(`${API_BASE_URL}/api/risk-history?student_id=${studentId}`);
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+  async getAdminAnalytics() {
+    const response = await fetch(`${API_BASE_URL}/api/v1/admin/analytics`);
+    if (!response.ok) throw new Error(`Backend error: ${response.status}`);
     return response.json();
   }
 };

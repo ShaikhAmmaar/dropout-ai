@@ -1,60 +1,50 @@
-
-import os
+import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routes import risk, mental_health, history
-from database import engine, Base
+from core.config import settings
+from db.database import engine, Base
+from routes import auth, students, risk, mental_health, admin
 
 app = FastAPI(
-    title="AI Crisis SaaS API",
-    description="Backend API for AI-Based Dropout Prediction & Mental Health Risk Detection",
-    version="1.0.0"
+    title=settings.PROJECT_NAME,
+    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    docs_url="/docs"
 )
 
-# Configure CORS
-# In production, specify actual frontend origins for better security
-origins = ["*"] 
+# CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"], # In production, restrict to your frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Routes registration
-app.include_router(risk.router, prefix="/api", tags=["Risk"])
-app.include_router(mental_health.router, prefix="/api", tags=["Mental Health"])
-app.include_router(history.router, prefix="/api", tags=["History"])
+# Database initialization
+@app.on_event("startup")
+async def init_db():
+    async with engine.begin() as conn:
+        # Create all tables if they don't exist
+        await conn.run_sync(Base.metadata.create_all)
+
+# Router registration
+app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["Authentication"])
+app.include_router(students.router, prefix=f"{settings.API_V1_STR}/students", tags=["Students"])
+app.include_router(risk.router, prefix=f"{settings.API_V1_STR}/risk", tags=["Risk Analysis"])
+app.include_router(mental_health.router, prefix=f"{settings.API_V1_STR}/mental-health", tags=["Mental Health"])
+app.include_router(admin.router, prefix=f"{settings.API_V1_STR}/admin", tags=["Admin Analytics"])
 
 @app.get("/")
-def root():
-    """Root endpoint to verify the API is running."""
+async def root():
     return {
-        "message": "Dropout AI Backend is Running 🚀",
-        "documentation": "/docs",
-        "redoc": "/redoc",
-        "health": "/health",
+        "message": f"Welcome to the {settings.PROJECT_NAME} Backend API 🚀",
+        "docs": "/docs",
         "status": "online"
     }
 
-@app.on_event("startup")
-async def startup():
-    """Ensure database tables are created on startup."""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
 @app.get("/health")
-def health_check():
-    """Simple health check endpoint."""
-    return {
-        "status": "ok", 
-        "environment": os.getenv("ENV", "development"),
-        "timestamp": os.getenv("RENDER_EXTERNAL_URL", "local")
-    }
+async def health_check():
+    return {"status": "healthy"}
 
 if __name__ == "__main__":
-    import uvicorn
-    # Use environment port or default to 8000
-    port = int(os.getenv("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run("main:app", host="0.0.0.0", port=settings.PORT, reload=True)

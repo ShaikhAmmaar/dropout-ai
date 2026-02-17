@@ -1,7 +1,10 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
 
-const supabaseUrl = (window as any).process?.env?.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = (window as any).process?.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+/**
+ * Supabase client with hardcoded credentials for direct Vercel deployment.
+ */
+const supabaseUrl = 'https://hjcndwjqugfwxpnvghjg.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhqY25kd2pxdWdmd3hwbnZnaGpnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyOTU1ODYsImV4cCI6MjA4Njg3MTU4Nn0.X9-6WXeiSCFE_yYjuh9s5f2JcTNKZrb5zQDUtSS3VV0';
 
-// If env vars aren't set in the browser yet, we provide a mock or handle gracefully
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);

@@ -2,7 +2,8 @@
 export enum RiskCategory {
   SAFE = 'SAFE',
   MODERATE = 'MODERATE',
-  HIGH = 'HIGH'
+  HIGH = 'HIGH',
+  CRITICAL = 'CRITICAL'
 }
 
 export enum EmotionalState {
@@ -46,7 +47,6 @@ export interface StudentData {
   id: string;
   institution_id: string;
   name: string;
-  // Added email to support matching students with their user accounts
   email: string;
   attendance_percentage: number;
   assignment_submission_rate: number;
@@ -71,7 +71,6 @@ export interface ImprovementSimulation {
   submission_plus_10: number;
 }
 
-// Added missing EmotionalAnalysis interface
 export interface EmotionalAnalysis {
   emotional_state: EmotionalState;
   emotional_score: number;
@@ -79,7 +78,6 @@ export interface EmotionalAnalysis {
   confidence_score: number;
 }
 
-// Added missing Intervention interface
 export interface Intervention {
   message: string;
   recovery_plan: string[];
@@ -99,7 +97,6 @@ export interface RiskReport {
   anomaly_reason?: string;
   emotional_drift_flag: boolean;
   improvement_simulation: ImprovementSimulation;
-  // Updated from any to specific interfaces
   emotional_analysis?: EmotionalAnalysis;
   intervention?: Intervention;
   timestamp: string;
@@ -123,6 +120,9 @@ export interface Alert {
   details: string;
 }
 
+/**
+ * Added missing AuditLog interface used for logging system actions.
+ */
 export interface AuditLog {
   id: string;
   institution_id: string;
@@ -132,8 +132,10 @@ export interface AuditLog {
   timestamp: string;
 }
 
-export interface ApiResponse<T> {
-  status: 'success' | 'error';
-  message: string;
-  data: T;
+export interface BiasReport {
+  gender_variance: number;
+  ses_variance: number;
+  location_variance: number;
+  overall_bias_score: number;
+  recommendations: string[];
 }

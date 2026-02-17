@@ -2,14 +2,14 @@ fastapi
 uvicorn
 sqlalchemy[asyncio]
 asyncpg
-psycopg2-binary
+aiosqlite
 python-jose[cryptography]
 passlib[bcrypt]
 scikit-learn
 shap
 numpy
 pandas
-requests
-python-dotenv
 google-generativeai
+python-dotenv
 pydantic[email]
+pydantic-settings
