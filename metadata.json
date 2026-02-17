@@ -1,0 +1,7 @@
+{
+  "name": "AI Dropout & Crisis Monitor",
+  "description": "A sophisticated platform for educational institutions to monitor student dropout risk and mental health crises using academic data and AI-powered journal analysis.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
