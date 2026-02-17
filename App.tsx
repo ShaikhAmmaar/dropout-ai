@@ -1,39 +1,33 @@
-
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { StudentDashboard } from './pages/StudentDashboard';
 import { AdminDashboard } from './pages/AdminDashboard';
-import { GraduationCap, LayoutDashboard, LogOut, ShieldAlert, Building2, Terminal } from 'lucide-react';
+import { GraduationCap, LayoutDashboard, LogOut, ShieldAlert, Terminal, Loader2 } from 'lucide-react';
 import { login, logout, getCurrentUser } from './services/authService';
-import { logAction } from './services/db';
 import { User, UserRole } from './types';
 
 const App: React.FC = () => {
-  // Use a stable initializer for user state to prevent repeated getCurrentUser() calls
   const [user, setUser] = useState<User | null>(() => getCurrentUser());
   const [activeView, setActiveView] = useState<'admin' | 'student'>('student');
   const [isInitializing, setIsInitializing] = useState(true);
 
-  // Derive default view from user role only when the user object actually changes (ID comparison)
-  useEffect(() => {
-    if (user) {
-      const targetView = user.role === UserRole.STUDENT ? 'student' : 'admin';
-      if (activeView !== targetView) {
-        setActiveView(targetView);
-      }
-    }
-  }, [user?.id, user?.role, activeView]);
+  // Memoized user ID for stable dependencies
+  const userId = user?.id;
+  const userRole = user?.role;
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsInitializing(false);
-    }, 800);
+    const timer = setTimeout(() => setIsInitializing(false), 800);
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (userRole) {
+      setActiveView(userRole === UserRole.STUDENT ? 'student' : 'admin');
+    }
+  }, [userRole]);
 
   const handleLogin = useCallback((u: User) => {
     login(u);
     setUser(u);
-    logAction(u.institution_id, u.id, 'LOGIN');
   }, []);
 
   const handleLogout = useCallback(() => {
@@ -43,10 +37,10 @@ const App: React.FC = () => {
 
   if (isInitializing) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 font-mono">
-        <div className="text-indigo-400 flex flex-col items-center gap-4">
-          <Terminal className="w-12 h-12 animate-pulse" />
-          <p className="text-sm tracking-widest">INITIALIZING ENTERPRISE AI TRIAGE...</p>
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+        <div className="text-indigo-500 flex flex-col items-center gap-4">
+          <Loader2 className="w-10 h-10 animate-spin" />
+          <p className="text-xs font-mono tracking-[0.3em] uppercase">Booting Enterprise AI Systems...</p>
         </div>
       </div>
     );
@@ -55,46 +49,34 @@ const App: React.FC = () => {
   if (!user) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white p-8 rounded-3xl shadow-xl border border-slate-100">
-          <div className="flex flex-col items-center mb-8">
-            <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-indigo-100">
-              <ShieldAlert className="w-8 h-8 text-white" />
+        <div className="max-w-md w-full bg-white p-10 rounded-[2.5rem] shadow-2xl border border-slate-100">
+          <div className="flex flex-col items-center mb-10">
+            <div className="w-20 h-20 bg-indigo-600 rounded-3xl flex items-center justify-center mb-6 shadow-xl shadow-indigo-200">
+              <ShieldAlert className="w-10 h-10 text-white" />
             </div>
-            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Enterprise AI Portal</h1>
-            <p className="text-slate-500 text-sm text-center mt-2">Accessing Phase 5 Optimized Infrastructure</p>
+            <h1 className="text-3xl font-black text-slate-900 tracking-tight text-center leading-tight">Crisis AI<br/><span className="text-indigo-600">Secure Access</span></h1>
           </div>
           
           <div className="space-y-4">
             <button 
-              onClick={() => handleLogin({ id: 'u-admin', institution_id: 'inst-1', role: UserRole.INSTITUTION_ADMIN, name: 'Apex Admin', email: 'admin@apex.edu' })}
-              className="w-full flex items-center gap-4 p-4 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-2xl hover:bg-indigo-100 transition-all text-left"
+              onClick={() => handleLogin({ id: 'u-admin', institution_id: 'inst-1', role: UserRole.INSTITUTION_ADMIN, name: 'Admin User', email: 'admin@apex.edu' })}
+              className="w-full flex items-center gap-4 p-5 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-3xl hover:bg-indigo-100 transition-all text-left group"
             >
-              <div className="bg-white p-2 rounded-lg"><LayoutDashboard className="w-6 h-6" /></div>
+              <div className="bg-white p-3 rounded-2xl shadow-sm group-hover:scale-110 transition-transform"><LayoutDashboard className="w-6 h-6" /></div>
               <div>
-                <div className="font-bold">Enterprise Admin</div>
-                <div className="text-[10px] uppercase font-bold opacity-70 tracking-wider">Apex Academy • Pro Access</div>
+                <div className="font-bold text-lg">Institution Admin</div>
+                <div className="text-[10px] uppercase font-black opacity-50 tracking-widest">Enterprise Access</div>
               </div>
             </button>
 
             <button 
               onClick={() => handleLogin({ id: 'u-maria', institution_id: 'inst-1', role: UserRole.STUDENT, name: 'Maria Garcia', email: 'maria@apex.edu' })}
-              className="w-full flex items-center gap-4 p-4 bg-slate-50 border border-slate-100 text-slate-700 rounded-2xl hover:bg-slate-100 transition-all text-left"
+              className="w-full flex items-center gap-4 p-5 bg-slate-50 border border-slate-100 text-slate-700 rounded-3xl hover:bg-slate-100 transition-all text-left group"
             >
-              <div className="bg-white p-2 rounded-lg"><GraduationCap className="w-6 h-6" /></div>
+              <div className="bg-white p-3 rounded-2xl shadow-sm group-hover:scale-110 transition-transform"><GraduationCap className="w-6 h-6" /></div>
               <div>
-                <div className="font-bold">Student Portal</div>
-                <div className="text-[10px] uppercase font-bold opacity-70 tracking-wider">Secure Assessment View</div>
-              </div>
-            </button>
-
-            <button 
-              onClick={() => handleLogin({ id: 'u-basic', institution_id: 'inst-2', role: UserRole.INSTITUTION_ADMIN, name: 'CC Admin', email: 'admin@cc.edu' })}
-              className="w-full flex items-center gap-4 p-4 bg-slate-100 border border-slate-200 text-slate-500 rounded-2xl hover:bg-slate-200 transition-all text-left grayscale hover:grayscale-0"
-            >
-              <div className="bg-white p-2 rounded-lg"><Building2 className="w-6 h-6" /></div>
-              <div>
-                <div className="font-bold">Basic Admin</div>
-                <div className="text-[10px] uppercase font-bold opacity-70 tracking-wider">Limited Functional Tier</div>
+                <div className="font-bold text-lg">Student Portal</div>
+                <div className="text-[10px] uppercase font-black opacity-50 tracking-widest">Secure Evaluation</div>
               </div>
             </button>
           </div>
@@ -104,44 +86,44 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <nav className="bg-white border-b border-slate-200 sticky top-0 z-50 px-4 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
-            <ShieldAlert className="w-5 h-5 text-white" />
+    <div className="min-h-screen flex flex-col bg-slate-50/50">
+      <nav className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 px-6 h-20 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-100">
+            <ShieldAlert className="w-6 h-6 text-white" />
           </div>
-          <span className="font-bold text-lg text-slate-900 hidden md:block tracking-tight">AI Crisis SaaS</span>
+          <span className="font-black text-xl text-slate-900 tracking-tighter">TRIAGE AI</span>
         </div>
 
-        <div className="flex bg-slate-100 p-1 rounded-xl">
-          {user.role !== UserRole.STUDENT && (
+        <div className="flex bg-slate-100 p-1.5 rounded-2xl">
+          {userRole !== UserRole.STUDENT && (
             <button
               onClick={() => setActiveView('admin')}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeView === 'admin' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}
+              className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeView === 'admin' ? 'bg-white text-indigo-600 shadow-lg' : 'text-slate-500 hover:text-slate-700'}`}
             >
-              Institutional Overview
+              Overview
             </button>
           )}
           <button
             onClick={() => setActiveView('student')}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeView === 'student' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}
+            className={`px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeView === 'student' ? 'bg-white text-indigo-600 shadow-lg' : 'text-slate-500 hover:text-slate-700'}`}
           >
-            My Assessments
+            Assessments
           </button>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="hidden sm:flex flex-col items-end mr-2">
-            <span className="text-xs font-bold text-slate-800">{user.name}</span>
-            <span className="text-[10px] font-extrabold text-indigo-600 uppercase tracking-tighter">{user.role}</span>
+        <div className="flex items-center gap-6">
+          <div className="hidden md:flex flex-col items-end">
+            <span className="text-sm font-bold text-slate-900">{user.name}</span>
+            <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest">{userRole}</span>
           </div>
-          <button onClick={handleLogout} className="p-2 text-slate-400 hover:text-red-500 transition-colors">
+          <button onClick={handleLogout} className="p-3 bg-slate-50 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all">
             <LogOut className="w-5 h-5" />
           </button>
         </div>
       </nav>
 
-      <main className="flex-1 overflow-y-auto bg-slate-50/50">
+      <main className="flex-1">
         {activeView === 'student' ? (
           <StudentDashboard user={user} />
         ) : (
@@ -149,13 +131,13 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <footer className="bg-white border-t p-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-          Enterprise Triage Engine • SaaS Phase 5 Stabilization
+      <footer className="bg-white border-t border-slate-200 p-6 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+          Phase 5 Production Infrastructure • Secure Node
         </div>
-        <div className="flex items-center gap-2 text-[9px] font-bold text-green-600">
+        <div className="flex items-center gap-3 text-[10px] font-black text-green-600 bg-green-50 px-4 py-2 rounded-full border border-green-100">
           <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-          AI SERVICES ONLINE (RF v2.5 / GEMINI-FLASH)
+          BACKEND SERVICES: ONLINE
         </div>
       </footer>
     </div>
