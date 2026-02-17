@@ -2,15 +2,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getStudents, saveStudent, addAlert, getInstitutions } from '../services/db';
 import { apiClient } from '../lib/api';
-import { analyzeEmotionalState, generateInterventionPlan } from '../services/geminiService';
-import { calculateSaaSRisk } from '../services/riskEngine';
+import { generateInterventionPlan } from '../services/geminiService';
 import { StudentWithReport, RiskReport, SubscriptionPlan, Institution, User } from '../types';
 import { RiskBadge } from '../components/RiskBadge';
 import { 
-  Send, Loader2, ShieldAlert, Info, Zap
+  Send, Loader2, ShieldAlert, Info, Zap, Sparkles, TrendingDown
 } from 'lucide-react';
 import { 
-  LineChart, Line, XAxis, YAxis, ResponsiveContainer, BarChart, Bar, Cell, ReferenceLine
+  LineChart, Line, XAxis, YAxis, ResponsiveContainer, BarChart, Bar, Cell, ReferenceLine, Tooltip
 } from 'recharts';
 
 interface Props {
@@ -39,20 +38,17 @@ export const StudentDashboard: React.FC<Props> = ({ user }) => {
     if (!student || !journal.trim()) return;
     setIsAnalyzing(true);
     try {
-      // 1. Call real backend for Mental Health Analysis
       const mentalHealthResponse = await apiClient.analyzeMentalHealth(student.id, journal);
       
-      // 2. Call real backend for Risk Prediction
       const riskResponse = await apiClient.predictRisk(student.id, {
-        gpa: student.grade_average / 25, // Convert 0-100 to 0-4 roughly
-        attendance_percentage: student.attendance_percentage,
-        assignment_completion_rate: student.assignment_submission_rate,
-        backlogs: student.disciplinary_flags
+        gpa: student.grade_average,
+        attendance_rate: student.attendance_percentage,
+        financial_stress_score: 0.2, // Default or student specific
+        family_support_score: 0.8    // Default or student specific
       });
 
-      // 3. Optional: LLM Intervention generation (Client-side proxy)
       let intervention = null;
-      if (institution?.subscription_plan !== SubscriptionPlan.BASIC && riskResponse.risk_score > 0.4) {
+      if (institution?.subscription_plan !== SubscriptionPlan.BASIC && (riskResponse.risk_score > 0.4 || mentalHealthResponse.crisis_flag)) {
         intervention = await generateInterventionPlan(student.name, { 
           risk_score: riskResponse.risk_score, 
           emotional_state: mentalHealthResponse.emotional_state 
@@ -63,7 +59,7 @@ export const StudentDashboard: React.FC<Props> = ({ user }) => {
         ml_risk_probability: Math.round(riskResponse.risk_score * 100),
         final_risk_score: Math.round(riskResponse.risk_score * 100),
         risk_category: riskResponse.risk_level.toUpperCase() as any,
-        predicted_30_day_risk: Math.round(riskResponse.risk_score * 110), // Synthetic
+        predicted_30_day_risk: Math.round(riskResponse.risk_score * 110),
         crisis_flag: mentalHealthResponse.crisis_flag,
         confidence_score: 92,
         timestamp: new Date().toISOString(),
@@ -72,9 +68,12 @@ export const StudentDashboard: React.FC<Props> = ({ user }) => {
           feature,
           impact: (impact as number) * 100
         })),
-        anomaly_flag: false,
+        anomaly_flag: riskResponse.risk_score > 0.8,
         emotional_drift_flag: false,
-        improvement_simulation: { attendance_plus_10: 15, submission_plus_10: 12 },
+        improvement_simulation: { 
+            attendance_plus_10: Math.max(0, Math.round(riskResponse.risk_score * 100 - 15)), 
+            submission_plus_10: Math.max(0, Math.round(riskResponse.risk_score * 100 - 12)) 
+        },
         emotional_analysis: {
           emotional_state: mentalHealthResponse.emotional_state as any,
           emotional_score: mentalHealthResponse.sentiment_score * 100,
@@ -103,7 +102,7 @@ export const StudentDashboard: React.FC<Props> = ({ user }) => {
           student_name: student.name,
           alert_type: 'CRISIS',
           severity: 'CRITICAL',
-          details: `Crisis detected by Render Backend: ${journal.substring(0, 50)}...`
+          details: `Crisis detected by AI Backend: ${journal.substring(0, 50)}...`
         });
       }
 
@@ -123,18 +122,9 @@ export const StudentDashboard: React.FC<Props> = ({ user }) => {
     }));
   }, [student]);
 
-  if (!student) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="flex flex-col items-center gap-2">
-          <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
-          <p className="text-slate-500 text-sm font-medium">Synchronizing Secure Profile...</p>
-        </div>
-      </div>
-    );
-  }
-
   const plan = institution?.subscription_plan || SubscriptionPlan.BASIC;
+
+  if (!student) return <div className="p-20 text-center"><Loader2 className="animate-spin mx-auto w-10 h-10 text-indigo-500" /></div>;
 
   return (
     <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8 animate-in fade-in duration-500">
@@ -147,7 +137,7 @@ export const StudentDashboard: React.FC<Props> = ({ user }) => {
            {plan === SubscriptionPlan.ENTERPRISE && student.report?.anomaly_flag && (
              <div className="bg-orange-100 text-orange-700 px-3 py-1.5 rounded-lg flex items-center gap-2 border border-orange-200">
                <Zap className="w-4 h-4" />
-               <span className="text-xs font-bold uppercase tracking-wider">Enterprise Alert: Anomaly Detected</span>
+               <span className="text-xs font-bold uppercase tracking-wider">Anomaly Warning</span>
              </div>
            )}
         </div>
@@ -164,17 +154,31 @@ export const StudentDashboard: React.FC<Props> = ({ user }) => {
             <div className="h-32">
                <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={trendData}>
-                    <Line 
-                      type="monotone" 
-                      dataKey="risk" 
-                      stroke="#6366f1" 
-                      strokeWidth={4} 
-                      dot={{ r: 4, fill: '#6366f1', strokeWidth: 2, stroke: '#fff' }} 
-                    />
+                    <Line type="monotone" dataKey="risk" stroke="#6366f1" strokeWidth={4} dot={{ r: 4, fill: '#6366f1', strokeWidth: 2, stroke: '#fff' }} />
                   </LineChart>
                </ResponsiveContainer>
             </div>
           </div>
+
+          {plan !== SubscriptionPlan.BASIC && student.report?.improvement_simulation && (
+              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+                  <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-4">
+                    <Sparkles className="w-4 h-4 text-amber-500" /> Improvement "What-If" Analysis
+                  </h3>
+                  <div className="space-y-4">
+                      <div className="p-4 bg-green-50 rounded-2xl border border-green-100 flex items-center justify-between">
+                          <div>
+                              <p className="text-xs font-bold text-green-800">Attendance +10%</p>
+                              <p className="text-[9px] text-green-600 font-medium">Predicted Risk Change</p>
+                          </div>
+                          <div className="flex items-center gap-1 text-green-700 font-black">
+                              <TrendingDown className="w-4 h-4" />
+                              {Math.round(student.report.ml_risk_probability - student.report.improvement_simulation.attendance_plus_10)}%
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          )}
 
           {plan === SubscriptionPlan.ENTERPRISE && student.report?.shap_explanation && (
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
@@ -195,49 +199,42 @@ export const StudentDashboard: React.FC<Props> = ({ user }) => {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              <p className="text-[10px] text-slate-400 mt-2 font-medium italic">* Real-time SHAP analysis from Render backend.</p>
             </div>
           )}
         </div>
 
         <div className="lg:col-span-2 space-y-6">
-          {plan !== SubscriptionPlan.BASIC && (
+          {plan !== SubscriptionPlan.BASIC && student.report?.intervention && (
             <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
               <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-3">
-                <ShieldAlert className="w-6 h-6 text-indigo-600" /> Academic Intervention Roadmap
+                <ShieldAlert className="w-6 h-6 text-indigo-600" /> AI-Generated Support Roadmap
               </h3>
-              {student.report?.intervention ? (
-                <div className="space-y-6">
-                  <div className="bg-indigo-50/50 p-6 rounded-2xl border border-indigo-100">
-                    <p className="text-sm text-indigo-900 leading-relaxed font-medium">"{student.report.intervention.message}"</p>
-                  </div>
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div className="space-y-3">
-                      <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Next 14 Days Plan</h4>
-                      <ul className="space-y-2">
-                        {student.report.intervention.recovery_plan.map((s: string, i: number) => (
-                          <li key={i} className="text-xs text-slate-600 flex items-start gap-2">
-                            <span className="text-indigo-500 font-bold">•</span> {s}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+              <div className="space-y-6">
+                <div className="bg-indigo-50/50 p-6 rounded-2xl border border-indigo-100">
+                  <p className="text-sm text-indigo-900 leading-relaxed font-medium">{student.report.intervention.message}</p>
+                </div>
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Recommended Actions</h4>
+                    <ul className="space-y-2">
+                      {student.report.intervention.recovery_plan.map((s: string, i: number) => (
+                        <li key={i} className="text-xs text-slate-600 flex items-start gap-2">
+                          <span className="text-indigo-500 font-bold">•</span> {s}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 </div>
-              ) : (
-                <div className="text-center py-12 border-2 border-dashed border-slate-100 rounded-2xl">
-                  <p className="text-sm text-slate-400 font-medium">Update your journal to generate a personalized AI recovery roadmap.</p>
-                </div>
-              )}
+              </div>
             </div>
           )}
 
           <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
-            <h3 className="text-lg font-bold text-slate-900 mb-2">Reflective Wellness Journal</h3>
-            <p className="text-xs text-slate-500 mb-6 font-medium">Your entries are processed by the Render Backend for deep sentiment analysis.</p>
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Secure Reflective Journal</h3>
+            <p className="text-xs text-slate-500 mb-6 font-medium">Your entries are processed by AI to assess well-being and risk markers.</p>
             <textarea
               className="w-full h-40 p-5 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all resize-none text-slate-700 text-sm font-medium leading-relaxed"
-              placeholder="How are your classes going? Is there anything stressing you out lately?"
+              placeholder="Share how you're feeling about your academic progress..."
               value={journal}
               onChange={(e) => setJournal(e.target.value)}
             />
@@ -245,13 +242,9 @@ export const StudentDashboard: React.FC<Props> = ({ user }) => {
               <button 
                 disabled={isAnalyzing || !journal.trim()}
                 onClick={handleJournalSubmit}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-2xl font-bold flex items-center gap-2 disabled:opacity-50 shadow-lg shadow-indigo-100 transition-all hover:-translate-y-0.5"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-2xl font-bold flex items-center gap-2 disabled:opacity-50 transition-all shadow-lg shadow-indigo-100"
               >
-                {isAnalyzing ? (
-                  <><Loader2 className="w-5 h-5 animate-spin" /> Backend Analysis...</>
-                ) : (
-                  <><Send className="w-5 h-5" /> Submit for Analysis</>
-                )}
+                {isAnalyzing ? <><Loader2 className="w-5 h-5 animate-spin" /> Analyzing...</> : <><Send className="w-5 h-5" /> Submit Log</>}
               </button>
             </div>
           </div>

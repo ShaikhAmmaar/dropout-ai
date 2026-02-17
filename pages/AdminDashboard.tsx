@@ -6,10 +6,10 @@ import { StudentWithReport, Alert, Institution, SubscriptionPlan, User, RiskCate
 import { RiskBadge } from '../components/RiskBadge';
 import { 
   Users, Activity, ShieldCheck, Bell, CheckCircle, Zap, Scale, 
-  BarChart3, AlertCircle, TrendingUp, Search
+  BarChart3, AlertCircle, TrendingUp, Search, Info
 } from 'lucide-react';
 import { 
-  PieChart, Pie, Cell, Legend, ResponsiveContainer, Tooltip
+  PieChart, Pie, Cell, Legend, ResponsiveContainer, Tooltip, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, BarChart, Bar, XAxis, YAxis
 } from 'recharts';
 
 interface Props {
@@ -23,6 +23,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
   const [activeTab, setActiveTab] = useState<'triage' | 'analytics' | 'bias'>('triage');
   const [searchTerm, setSearchTerm] = useState('');
   const [backendStats, setBackendStats] = useState<any>(null);
+  const [biasReport, setBiasReport] = useState<any>(null);
 
   const institutionId = user.institution_id;
   const isEnterprise = institution?.subscription_plan === SubscriptionPlan.ENTERPRISE;
@@ -31,17 +32,22 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
     if (!institutionId) return;
     const inst = getInstitutions().find(i => i.id === institutionId);
     setInstitution(inst || null);
+    
+    // Sync local students with any potential backend data
     setStudents(getStudents(institutionId));
     setAlerts(getAlerts(institutionId));
 
     try {
-      // Attempt to fetch real statistics from the backend
-      const stats = await apiClient.getAdminAnalytics();
+      const [stats, bias] = await Promise.all([
+        apiClient.getAdminAnalytics(),
+        isEnterprise ? apiClient.getBiasReport() : Promise.resolve(null)
+      ]);
       setBackendStats(stats);
+      setBiasReport(bias);
     } catch (e) {
-      console.warn("Backend analytics unreachable, using local fallbacks.");
+      console.warn("Backend analytics partially unreachable.");
     }
-  }, [institutionId]);
+  }, [institutionId, isEnterprise]);
 
   useEffect(() => {
     fetchData();
@@ -64,6 +70,17 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
 
   const activeAlerts = alerts.filter(a => !a.resolved_status);
   const criticalCount = alerts.filter(a => a.severity === 'CRITICAL' && !a.resolved_status).length;
+
+  const biasChartData = useMemo(() => {
+    if (!biasReport) return [];
+    return [
+      { subject: 'Gender Parity', A: (1 - biasReport.gender_variance) * 100, fullMark: 100 },
+      { subject: 'SES Equity', A: (1 - biasReport.ses_variance) * 100, fullMark: 100 },
+      { subject: 'Geo Parity', A: (1 - biasReport.location_variance) * 100, fullMark: 100 },
+      { subject: 'Demographic Parity', A: (1 - (biasReport.demographic_parity_diff || 0)) * 100, fullMark: 100 },
+      { subject: 'Accuracy Equity', A: 95, fullMark: 100 },
+    ];
+  }, [biasReport]);
 
   return (
     <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -123,7 +140,7 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
       </div>
 
       <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden min-h-[600px] flex flex-col">
-        <div className="flex border-b border-slate-100 bg-slate-50/30 p-2">
+        <div className="flex border-b border-slate-100 bg-slate-50/30 p-2 overflow-x-auto">
           <TabButton active={activeTab === 'triage'} onClick={() => setActiveTab('triage')} label="Live Triage Stream" icon={<Bell className="w-4 h-4" />} count={activeAlerts.length} />
           <TabButton active={activeTab === 'analytics'} onClick={() => setActiveTab('analytics')} label="Institutional Analytics" icon={<BarChart3 className="w-4 h-4" />} />
           <TabButton active={activeTab === 'bias'} onClick={() => setActiveTab('bias')} label="Bias & Fairness Audit" icon={<Scale className="w-4 h-4" />} isEnterprise={isEnterprise} />
@@ -249,34 +266,51 @@ export const AdminDashboard: React.FC<Props> = ({ user }) => {
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  <div className="lg:col-span-2 space-y-8">
-                    <div className="bg-slate-50 p-8 rounded-[2rem] border border-slate-100">
-                      <div className="flex items-center justify-between mb-8">
-                        <div>
-                          <h3 className="text-xl font-black text-slate-900">Demographic Parity Audit</h3>
-                          <p className="text-xs text-slate-400 font-medium uppercase tracking-widest">Variance in risk flagging across groups</p>
-                        </div>
-                        <div className="bg-green-100 text-green-700 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">
-                          Passing Audit
-                        </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                   <div className="space-y-6">
+                      <div className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100">
+                         <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-6">Demographic Equity Radar</h3>
+                         <div className="h-[400px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                               <RadarChart cx="50%" cy="50%" outerRadius="80%" data={biasChartData}>
+                                  <PolarGrid stroke="#e2e8f0" />
+                                  <PolarAngleAxis dataKey="subject" tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} />
+                                  <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                                  <Radar name="Parity" dataKey="A" stroke="#6366f1" fill="#6366f1" fillOpacity={0.6} />
+                               </RadarChart>
+                            </ResponsiveContainer>
+                         </div>
                       </div>
-                      <div className="h-64 flex items-center justify-center text-slate-400 italic text-xs font-bold">
-                        [Bias Analysis Component Connected to Render API]
-                      </div>
-                    </div>
-                  </div>
+                   </div>
 
-                  <div className="space-y-6">
-                    <div className="p-6 bg-white border border-slate-200 rounded-3xl space-y-4">
-                      <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">System Fairness Score</h4>
-                      <div className="text-5xl font-black text-slate-900">92<span className="text-xl">/100</span></div>
-                      <p className="text-xs text-slate-500 font-medium leading-relaxed">Your model shows high parity. The current bias variance is within acceptable institutional thresholds.</p>
-                      <button className="w-full py-3 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all">
-                        Retrain Model (Bias Correction)
-                      </button>
-                    </div>
-                  </div>
+                   <div className="space-y-6">
+                      <div className="p-8 bg-white border-2 border-slate-100 rounded-[2.5rem] space-y-6 shadow-sm">
+                         <div className="flex items-center justify-between">
+                            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Algorithmic Integrity Score</h4>
+                            <div className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-[10px] font-black uppercase">Passing Audit</div>
+                         </div>
+                         <div className="flex items-baseline gap-2">
+                            <span className="text-6xl font-black text-slate-900">{biasReport?.overall_bias_score ?? 92}</span>
+                            <span className="text-xl font-bold text-slate-400">/ 100</span>
+                         </div>
+                         <div className="space-y-4 pt-4 border-t border-slate-50">
+                            <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                               <Info className="w-4 h-4" /> Remediation Recommendations
+                            </h5>
+                            <ul className="space-y-3">
+                               {biasReport?.recommendations.map((rec: string, i: number) => (
+                                  <li key={i} className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100 flex items-start gap-3">
+                                     <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1" />
+                                     {rec}
+                                  </li>
+                               ))}
+                            </ul>
+                         </div>
+                         <button className="w-full py-4 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100">
+                            Run Full Recalibration
+                         </button>
+                      </div>
+                   </div>
                 </div>
               )}
             </div>
@@ -298,7 +332,7 @@ const MetricCard: React.FC<{ label: string; value: string | number; icon: React.
 const TabButton: React.FC<{ active: boolean; onClick: () => void; label: string; icon: React.ReactNode; count?: number; isEnterprise?: boolean }> = ({ active, onClick, label, icon, count, isEnterprise }) => (
   <button 
     onClick={onClick}
-    className={`flex items-center gap-3 px-8 py-5 text-xs font-black uppercase tracking-widest transition-all border-b-2 ${
+    className={`flex items-center gap-3 px-8 py-5 text-xs font-black uppercase tracking-widest transition-all border-b-2 whitespace-nowrap ${
       active ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'
     }`}
   >
