@@ -4,20 +4,20 @@
  * Hardcoded values for direct Vercel deployment as requested.
  */
 
-const API_BASE_URL = 'https://dropout-ai-backend.onrender.com';
+const BASE_URL = 'https://dropout-ai-backend.onrender.com';
+const API_V1 = `${BASE_URL}/api/v1`;
 
 export const apiClient = {
   /**
    * Predicts dropout risk based on academic metrics.
    */
-  async predictRisk(data: {
-    student_id: string;
+  async predictRisk(studentId: string, data: {
     gpa: number;
     attendance_percentage: number;
     assignment_completion_rate: number;
     backlogs: number;
   }) {
-    const response = await fetch(`${API_BASE_URL}/api/v1/risk/predict/${data.student_id}`, {
+    const response = await fetch(`${API_V1}/risk/predict/${studentId}`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
@@ -31,8 +31,8 @@ export const apiClient = {
   /**
    * Analyzes student journal text for emotional distress.
    */
-  async analyzeMentalHealth(text: string, studentId: string) {
-    const response = await fetch(`${API_BASE_URL}/api/v1/mental-health/log/${studentId}`, {
+  async analyzeMentalHealth(studentId: string, text: string) {
+    const response = await fetch(`${API_V1}/mental-health/log/${studentId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text_entry: text }),
@@ -45,7 +45,7 @@ export const apiClient = {
    * Fetches the analytics for the admin dashboard.
    */
   async getAdminAnalytics() {
-    const response = await fetch(`${API_BASE_URL}/api/v1/admin/analytics`);
+    const response = await fetch(`${API_V1}/admin/analytics`);
     if (!response.ok) throw new Error(`Backend error: ${response.status}`);
     return response.json();
   }
