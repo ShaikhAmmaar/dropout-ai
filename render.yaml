@@ -1,0 +1,27 @@
+
+services:
+  # Backend FastAPI Service
+  - type: web
+    name: dropout-ai-backend
+    env: python
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.0
+      - key: API_V1_STR
+        value: /api/v1
+      - key: PROJECT_NAME
+        value: "Dropout AI Backend"
+
+  # Frontend Static Site
+  - type: static
+    name: dropout-ai-frontend
+    env: static
+    # Assuming a standard Vite build. If you don't have a package.json, 
+    # Render can also serve just the directory if it's plain HTML/JS.
+    buildCommand: npm install && npm run build
+    publishPath: ./dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://dropout-ai-backend.onrender.com

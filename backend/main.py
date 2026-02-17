@@ -1,3 +1,4 @@
+
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,9 +13,11 @@ app = FastAPI(
 )
 
 # CORS configuration
+# Allowing all origins for demo/Render deployment. 
+# In a strict production environment, replace ["*"] with your specific Render frontend URL.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In production, restrict to your frontend URL
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -39,7 +42,8 @@ async def root():
     return {
         "message": f"Welcome to the {settings.PROJECT_NAME} Backend API 🚀",
         "docs": "/docs",
-        "status": "online"
+        "status": "online",
+        "environment": "Render Production"
     }
 
 @app.get("/health")
@@ -47,4 +51,6 @@ async def health_check():
     return {"status": "healthy"}
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=settings.PORT, reload=True)
+    # Use environment PORT for Render
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)

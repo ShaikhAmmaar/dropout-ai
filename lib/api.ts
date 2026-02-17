@@ -1,9 +1,9 @@
 
 /**
  * API Client for interacting with the FastAPI Backend on Render.
- * Hardcoded values for direct Vercel deployment as requested.
  */
 
+// Use the environment variable if available (for production), otherwise fallback to the hardcoded Render URL.
 const BASE_URL = 'https://dropout-ai-backend.onrender.com';
 const API_V1 = `${BASE_URL}/api/v1`;
 
@@ -24,7 +24,11 @@ export const apiClient = {
       },
       body: JSON.stringify(data),
     });
-    if (!response.ok) throw new Error(`Backend error: ${response.status}`);
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Backend error: ${response.status}`);
+    }
     return response.json();
   },
 
@@ -37,7 +41,11 @@ export const apiClient = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text_entry: text }),
     });
-    if (!response.ok) throw new Error(`Backend error: ${response.status}`);
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || `Backend error: ${response.status}`);
+    }
     return response.json();
   },
 
@@ -46,7 +54,9 @@ export const apiClient = {
    */
   async getAdminAnalytics() {
     const response = await fetch(`${API_V1}/admin/analytics`);
-    if (!response.ok) throw new Error(`Backend error: ${response.status}`);
+    if (!response.ok) {
+      throw new Error(`Backend analytics error: ${response.status}`);
+    }
     return response.json();
   }
 };
